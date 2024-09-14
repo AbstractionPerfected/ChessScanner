@@ -28,31 +28,25 @@
     var game = new Chess(); // chess.js
     var engine = new Worker("stockfish.js"); // stockfish.js (5)
 
-    const calculateAverage = (array) => { // gets array and counts each of the moves, returns average and cout
-        /*
-        array = ['e4','e4','e4','e4','e4']*/
-        var dataArray = {},
-            oldArray = {}
-        array.forEach((value, index) => {
-            var data = dataArray[index] || 0;
-            data ++;
-            dataArray[index], oldArray[index] = data, data;
-        })
+    const calculateAverages = (data) => {
+        const averages = {};
 
-        var alreadyDone = {}
-        array.forEach((value, index) => {
-            if (!alreadyDone[index]) {
-                alreadyDone[index] = true;
-                dataArray[index] = dataArray[index] / array.length;
-            };
-        })
+        for (const [moveType, moves] of Object.entries(data)) {
+            const moveCounts = moves.reduce((acc, move) => {
+                acc[move] = (acc[move] || 0) + 1; // :cry:
+                return acc;
+            }, {});
 
-        /*expected output of dataArray:
-        {"e4":3,"e2":6} (average)*/
-        /*expected output of oldArray:
-        {"e4":7,"e2":9} (non-average)*/
-        return dataArray, oldArray
-    }
+            const totalMoves = moves.length;
+            averages[moveType] = {};
+
+            for (const [move, count] of Object.entries(moveCounts)) {
+                averages[moveType][move] = count / totalMoves;
+            }
+        }
+
+        return averages;
+    };
       
     const calculateNewMove = (move) => {
         resetBoard();
@@ -111,9 +105,12 @@
           printOutAll()
         }
         if (e.key == "r") {
-            var dataArray, oldArray = calculateAverage(compiledData["e4"])
-            printOutAll(dataArray);
-            printOutAll(oldArray);
+            for (let index = 0; index < compiledData.length; index++) {
+                const element = compiledData[index];
+                const averages = calculateAverages(element);
+                const json = JSON.stringify(averages)
+                console.log(`${index}: ${json}`)
+            }
         }
     }, false);
 
