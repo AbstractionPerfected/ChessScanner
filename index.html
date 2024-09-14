@@ -1,0 +1,130 @@
+<html>
+  <style>html{background-color:black}</style>
+  <title>chess</title>
+  <body style="color:white; font-famy:Arial">
+
+  </body>
+  <script src="./chess.js"></script>
+  <script>
+    const depth = prompt("depth amount", "10") || "1"
+    const compiledData = {};
+    const clearOut = () => document.body.innerText = "";
+    const printOut = (str) => document.body.innerText += (str + "\n");
+    printOut("starting with " + depth + " depth")
+    function parseBestMove(line) {
+        var match = line.match(/bestmove\s([a-h][1-8][a-h][1-8])(n|N|b|B|r|R|q|Q)?/);
+        if (match) {
+            var bestMove = match[1];
+            var promotion = match[2];
+            return {
+                from: bestMove.substring(0, 2),
+                to: bestMove.substring(2, 4),
+                promotion: promotion
+            };
+        }
+        return undefined;
+    }
+
+    var game = new Chess(); // chess.js
+    var engine = new Worker("stockfish.js"); // stockfish.js (5)
+
+    const calculateAverage = (array) => { // gets array and counts each of the moves, returns average and cout
+        /*
+        array = ['e4','e4','e4','e4','e4']*/
+        var dataArray = {},
+            oldArray = {}
+        array.forEach((value, index) => {
+            var data = dataArray[index] || 0;
+            data ++;
+            dataArray[index], oldArray[index] = data, data;
+        })
+
+        var alreadyDone = {}
+        array.forEach((value, index) => {
+            if (!alreadyDone[index]) {
+                alreadyDone[index] = true;
+                dataArray[index] = dataArray[index] / array.length;
+            };
+        })
+
+        /*expected output of dataArray:
+        {"e4":3,"e2":6} (average)*/
+        /*expected output of oldArray:
+        {"e4":7,"e2":9} (non-average)*/
+        return dataArray, oldArray
+    }
+      
+    const calculateNewMove = (move) => {
+        resetBoard();
+        game.move(move);
+        var msg = "position fen " + game.fen();
+        engine.postMessage(msg);
+        engine.postMessage("go depth " + depth);
+        return new Promise((resolve, reject) => {
+            const onMessage = (event) => {
+                var line = event.data;
+                var bestMove = parseBestMove(line);
+                if (bestMove != undefined) {
+                    engine.removeEventListener("message", onMessage);
+                    resolve(bestMove);
+                }
+            };
+            engine.addEventListener("message", onMessage);
+        });
+    };
+
+    const resetBoard = () => {
+        engine.postMessage("ucinewgame");
+        game = new Chess();
+    };
+
+    engine.postMessage("uci");
+    engine.postMessage("ucinewgame");
+
+    var move = 0;
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const attemptMove = async (moveName) => {
+        move++;
+        console.log(move);
+        await delay(100);
+        var data = [];
+        try {
+            for (let i = 0; i < 10; i++) {
+                const bestMove = await calculateNewMove(moveName);
+                data.push(bestMove.to);
+                printOut(`[${move}-${i}] ${moveName} -> (${bestMove.from}) ${bestMove.to}`);
+
+              compiledData[moveName] = data;
+            }
+            console.log(`starting ${moveName} ====`)
+            console.log(data);
+            compiledData[moveName] = data;
+        } catch (error) {
+            console.error('Error calculating move:', error);
+        }
+    };
+
+    const printOutAll = (john= compiledData) =>             printOut(JSON.stringify(john));
+
+    window.addEventListener('keydown', function(e) {
+        if (e.key == "e") {
+          printOutAll()
+        }
+        if (e.key == "r") {
+            var dataArray, oldArray = calculateAverage(compiledData["e4"])
+            printOutAll(dataArray);
+            printOutAll(oldArray);
+        }
+    }, false);
+
+    //const knightMoves = ["Na3", "Nh3", "Nf3", "Nc3"];
+    ["Na3", "Nh3", "Nf3", "Nc3"].forEach(async value => await attemptMove(value) &&   printOut(`finished knight move ${value}`));
+    ["a", "b", "c", "d", "e", "f", "g", "h"].forEach(async (value) => {
+        await attemptMove(value + "3");
+        printOut(`finished letter ${value} (3)`)
+        await attemptMove(value + "4");
+        printOut(`finished letter ${value} (4)`)
+      if (value == "h") { printOut("finished!"); printOutAll(); }
+    });
+  </script>
+</html>
